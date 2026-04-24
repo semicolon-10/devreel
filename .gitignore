@@ -1,0 +1,30 @@
+# Rust
+src-tauri/target/
+src-tauri/gen/
+
+# Frontend
+src/node_modules/
+src/dist/
+
+# Root
+node_modules/
+dist/
+
+# Tauri
+*.dmg
+*.app
+
+# Whisper models (large binary files)
+*.bin
+*.gguf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
