@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "identifier": "com.sooraj.devreel",
   "build": {
-    "frontendDist": "../src",
-    "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "yarn dev",
-    "beforeBuildCommand": "yarn build"
+  "frontendDist": "../src/dist",
+  "devUrl": "http://localhost:1420",
+  "beforeDevCommand": "cd src && yarn dev",
+  "beforeBuildCommand": "cd src && yarn build"
   },
   "app": {
     "withGlobalTauri": true,
@@ -48,10 +48,7 @@
     ],
     "macOS": {
       "entitlements": "entitlements.plist",
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "DevReel needs mic access for live captions",
-        "NSScreenCaptureUsageDescription": "DevReel needs screen capture for recording"
-      }
+      "infoPlist": null
     }
   }
 }

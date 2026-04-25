@@ -10,10 +10,10 @@
     "core:window:allow-maximize",
     "core:window:allow-minimize",
     "shell:allow-open",
-    "fs:allow-read-files",
-    "fs:allow-write-files",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
     "fs:allow-read-dir",
-    "fs:allow-create-dir",
+    "fs:allow-mkdir",
     "dialog:allow-save",
     "dialog:allow-open"
   ]
