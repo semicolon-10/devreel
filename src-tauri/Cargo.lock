@@ -875,6 +875,7 @@ dependencies = [
  "env_logger",
  "image",
  "log",
+ "once_cell",
  "serde",
  "serde_json",
  "tauri",
