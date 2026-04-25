@@ -2,7 +2,6 @@ import { useStore } from "@/store"
 import CaptionOverlay from "@/components/CaptionOverlay"
 import Whiteboard from "@/components/Whiteboard"
 import CodeBlock from "@/components/CodeBlock"
-import TextTool from "@/components/TextTool"
 
 function RecIndicator() {
   const { status, duration } = useStore()
@@ -90,7 +89,6 @@ export default function Preview() {
         <RecIndicator />
         <CodeBlock />
         <Whiteboard />
-        <TextTool />
         <CaptionOverlay />
       </div>
 

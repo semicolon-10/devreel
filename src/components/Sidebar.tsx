@@ -1,34 +1,32 @@
 import { useStore } from "@/store"
+import {
+  MousePointer2,
+  Pencil,
+  Type,
+  Shapes,
+  Code2,
+  Captions,
+} from "lucide-react"
 
 type Tool = "cursor" | "draw" | "text" | "shape" | "code" | "caption"
 
-const tools: { id: Tool; label: string; icon: string }[] = [
-  { id: "cursor", label: "Cursor", icon: "⌖" },
-  { id: "draw", label: "Draw", icon: "✏" },
-  { id: "text", label: "Text", icon: "T" },
-  { id: "shape", label: "Shape", icon: "◻" },
-  { id: "code", label: "Code", icon: "</>" },
-  { id: "caption", label: "Caption", icon: "CC" },
+const tools: { id: Tool; label: string; icon: React.ReactNode }[] = [
+  { id: "cursor", label: "Cursor", icon: <MousePointer2 size={16} /> },
+  { id: "draw", label: "Draw", icon: <Pencil size={16} /> },
+  { id: "text", label: "Text", icon: <Type size={16} /> },
+  { id: "shape", label: "Shapes", icon: <Shapes size={16} /> },
+  { id: "code", label: "Code", icon: <Code2 size={16} /> },
+  { id: "caption", label: "Captions", icon: <Captions size={16} /> },
 ]
 
 export default function Sidebar() {
-  const { tool, setTool, setShowCode, setShowWhiteboard, setCodeContent, codeLanguage } = useStore()
+  const { tool, setTool, setShowCode } = useStore()
 
   function handleToolClick(id: Tool) {
-  setTool(id)
-  if (id !== "code") setShowCode(false)
-  if (id !== "draw") setShowWhiteboard(false)
-  if (id === "code") {
-    setShowCode(true)
-    if (!useStore.getState().codeContent) {
-      setCodeContent(codeLanguage === "rust"
-        ? `async fn fetch(url: &str) {\n  let res = reqwest::get(url).await?;\n  println!("{}", res.text().await?);\n}`
-        : `async def fetch(url):\n  async with aiohttp.ClientSession() as s:\n    r = await s.get(url)\n    print(await r.text())`
-      )
-    }
+    setTool(id)
+    if (id === "code") setShowCode(true)
+    else setShowCode(false)
   }
-  if (id === "draw") setShowWhiteboard(true)
-}
 
   return (
     <div style={{
@@ -52,20 +50,32 @@ export default function Sidebar() {
               margin: "6px 0",
             }} />
           )}
-          <button
-            className={`icon-btn ${tool === t.id ? "active" : ""}`}
-            title={t.label}
-            onClick={() => handleToolClick(t.id)}
-            style={{
-              width: "36px",
-              height: "36px",
-              fontSize: t.id === "code" ? "9px" : "14px",
-              fontWeight: "600",
-              color: tool === t.id ? "var(--accent-light)" : "var(--text-secondary)",
-            }}
-          >
-            {t.icon}
-          </button>
+          <div style={{ position: "relative" }}>
+            <button
+              className={`icon-btn ${tool === t.id ? "active" : ""}`}
+              title={t.label}
+              onClick={() => handleToolClick(t.id)}
+              style={{
+                width: "36px",
+                height: "36px",
+                color: tool === t.id ? "var(--accent-light)" : "var(--text-secondary)",
+              }}
+            >
+              {t.icon}
+            </button>
+            {tool === t.id && (
+              <div style={{
+                position: "absolute",
+                left: 0,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 2,
+                height: 20,
+                background: "var(--accent-light)",
+                borderRadius: "0 2px 2px 0",
+              }} />
+            )}
+          </div>
         </div>
       ))}
     </div>
