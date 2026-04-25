@@ -2,26 +2,30 @@ import Sidebar from "@/components/Sidebar"
 import Preview from "@/components/Preview"
 import SidePanel from "@/components/SidePanel"
 import Timeline from "@/components/Timeline"
+import { RecorderProvider } from "@/context/RecorderContext"
+
 export default function App() {
   return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      height: "100vh",
-      width: "100vw",
-      background: "var(--bg-base)",
-      overflow: "hidden",
-    }}>
+    <RecorderProvider>
       <div style={{
         display: "flex",
-        flex: 1,
+        flexDirection: "column",
+        height: "100vh",
+        width: "100vw",
+        background: "var(--bg-base)",
         overflow: "hidden",
       }}>
-        <Sidebar />
-        <Preview />
-        <SidePanel />
+        <div style={{
+          display: "flex",
+          flex: 1,
+          overflow: "hidden",
+        }}>
+          <Sidebar />
+          <Preview />
+          <SidePanel />
+        </div>
+        <Timeline />
       </div>
-      <Timeline />
-    </div>
+    </RecorderProvider>
   )
 }

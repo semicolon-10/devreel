@@ -52,7 +52,7 @@ pub fn encode(_app: &AppHandle, config: ExportConfig) -> Result<String, String> 
     }
 }
 
-fn find_ffmpeg() -> Result<String, String> {
+pub fn find_ffmpeg() -> Result<String, String> {
     let candidates = vec![
         "/opt/homebrew/bin/ffmpeg",
         "/usr/local/bin/ffmpeg",

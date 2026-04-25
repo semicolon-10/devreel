@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "react"
-import { invoke } from "@tauri-apps/api/core"
-import { listen } from "@tauri-apps/api/event"
 import { useStore } from "@/store"
+import { useRecorderContext } from "@/context/RecorderContext"
+import { save } from "@tauri-apps/plugin-dialog"
 
 const TRACKS = [
   { label: "video", color: "rgba(139,92,246,0.35)", width: "70%" },
@@ -63,46 +62,16 @@ function TrackRow({ label, color, width, offset, segments }: {
 }
 
 export default function Timeline() {
-  const { status, duration, setStatus, setDuration } = useStore()
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const unlistenRef = useRef<(() => void)[]>([])
+  const { status, duration } = useStore()
+  const { startRecording, pauseRecording, stopRecording, exportRecording, recordingBlobRef } = useRecorderContext()
 
   const mins = String(Math.floor(duration / 60)).padStart(2, "0")
   const secs = String(duration % 60).padStart(2, "0")
 
-  useEffect(() => {
-    async function setupListeners() {
-      const unlistenDuration = await listen<number>("duration_tick", (e) => {
-        setDuration(e.payload)
-      })
-
-      const unlistenStatus = await listen<string>("recording_status", (e) => {
-        setStatus(e.payload as "idle" | "recording" | "paused")
-      })
-
-      const unlistenError = await listen<string>("recording_error", (e) => {
-        console.error("Recording error:", e.payload)
-      })
-
-      unlistenRef.current = [unlistenDuration, unlistenStatus, unlistenError]
-    }
-
-    setupListeners()
-
-    return () => {
-      unlistenRef.current.forEach((u) => u())
-    }
-  }, [])
-
   async function handleRecord() {
     try {
-      if (status === "idle") {
-        const outputPath = `${Date.now()}_devreel.mp4`
-        await invoke("start_recording", { outputPath })
-        await invoke("start_caption_stream")
-      } else if (status === "recording" || status === "paused") {
-        await invoke("pause_recording")
-      }
+      if (status === "idle") await startRecording()
+      else pauseRecording()
     } catch (e) {
       console.error("Record error:", e)
     }
@@ -110,36 +79,29 @@ export default function Timeline() {
 
   async function handleStop() {
     try {
-      await invoke("stop_recording")
-      await invoke("stop_caption_stream")
-      setDuration(0)
+      const blob = await stopRecording()
+      recordingBlobRef.current = blob
     } catch (e) {
       console.error("Stop error:", e)
     }
   }
 
   async function handleExport() {
-  try {
-    const { save } = await import("@tauri-apps/plugin-dialog")
-    const outputPath = await save({
-      filters: [{ name: "Video", extensions: ["mp4"] }],
-      defaultPath: `devreel_${Date.now()}.mp4`,
-    })
-    if (!outputPath) return
-    await invoke("export_reel", {
-      config: {
-        input_path: "",
-        output_path: outputPath,
-        width: 1920,
-        height: 1080,
-        fps: 30,
-        quality: "High",
+    try {
+      if (!recordingBlobRef.current) {
+        alert("No recording to export. Record something first.")
+        return
       }
-    })
-  } catch (e) {
-    console.error("Export error:", e)
+      const outputPath = await save({
+        filters: [{ name: "Video", extensions: ["mp4"] }],
+        defaultPath: `devreel_${Date.now()}.mp4`,
+      })
+      if (!outputPath) return
+      await exportRecording(recordingBlobRef.current, outputPath)
+    } catch (e) {
+      console.error("Export error:", e)
+    }
   }
-}
 
   return (
     <div style={{
@@ -207,7 +169,7 @@ export default function Timeline() {
           onClick={handleExport}
           style={{ marginLeft: "auto", fontSize: 11, padding: "4px 14px" }}
         >
-          Export 8K ↗
+          Export ↗
         </button>
       </div>
 

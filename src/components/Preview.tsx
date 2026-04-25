@@ -2,6 +2,7 @@ import { useStore } from "@/store"
 import CaptionOverlay from "@/components/CaptionOverlay"
 import Whiteboard from "@/components/Whiteboard"
 import CodeBlock from "@/components/CodeBlock"
+import { useRecorderContext } from "@/context/RecorderContext"
 
 function RecIndicator() {
   const { status, duration } = useStore()
@@ -52,6 +53,8 @@ function RecIndicator() {
 }
 
 export default function Preview() {
+  const { phoneFrameRef } = useRecorderContext()
+
   return (
     <div style={{
       flex: 1,
@@ -76,16 +79,19 @@ export default function Preview() {
         pointerEvents: "none",
       }} />
 
-      <div style={{
-        width: 360,
-        height: 640,
-        borderRadius: 36,
-        border: "1.5px solid rgba(255,255,255,0.12)",
-        background: "linear-gradient(180deg, #0d0d1a 0%, #0a0a12 100%)",
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
-      }}>
+      <div
+        ref={phoneFrameRef}
+        style={{
+          width: 360,
+          height: 640,
+          borderRadius: 36,
+          border: "1.5px solid rgba(255,255,255,0.12)",
+          background: "linear-gradient(180deg, #0d0d1a 0%, #0a0a12 100%)",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+        }}
+      >
         <RecIndicator />
         <CodeBlock />
         <Whiteboard />
@@ -101,8 +107,8 @@ export default function Preview() {
         gap: 6,
       }}>
         {[
-          { label: "resolution", value: "8K · 9:16" },
-          { label: "fps", value: "60 fps" },
+          { label: "resolution", value: "360 · 9:16" },
+          { label: "fps", value: "30 fps" },
         ].map((s) => (
           <div key={s.label} style={{
             background: "rgba(0,0,0,0.5)",
