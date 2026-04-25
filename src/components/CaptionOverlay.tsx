@@ -1,10 +1,37 @@
+import { useEffect } from "react"
+import { listen } from "@tauri-apps/api/event"
 import { motion, AnimatePresence } from "framer-motion"
 import { useStore } from "@/store"
 
+interface CaptionPayload {
+  id: string
+  text: string
+  start_time: number
+  end_time: number
+}
+
 export default function CaptionOverlay() {
-  const { activeCaptions, captionStyle } = useStore()
+  const { activeCaptions, setActiveCaptions, addCaption, captionStyle } = useStore()
   const isYellow = captionStyle === "bold-yellow"
   const isKinetic = captionStyle === "kinetic"
+
+  useEffect(() => {
+    let unlisten: () => void
+
+    listen<CaptionPayload>("caption_chunk", (e) => {
+      const c = {
+        id: e.payload.id,
+        text: e.payload.text,
+        startTime: e.payload.start_time,
+        endTime: e.payload.end_time,
+      }
+      addCaption(c)
+      setActiveCaptions([c])
+      setTimeout(() => setActiveCaptions([]), 3000)
+    }).then((u) => { unlisten = u })
+
+    return () => { if (unlisten) unlisten() }
+  }, [])
 
   return (
     <div style={{

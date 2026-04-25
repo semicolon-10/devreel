@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react"
+import { invoke } from "@tauri-apps/api/core"
+import { listen } from "@tauri-apps/api/event"
 import { useStore } from "@/store"
 
 const TRACKS = [
@@ -63,32 +65,74 @@ function TrackRow({ label, color, width, offset, segments }: {
 export default function Timeline() {
   const { status, duration, setStatus, setDuration } = useStore()
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const unlistenRef = useRef<(() => void)[]>([])
 
   const mins = String(Math.floor(duration / 60)).padStart(2, "0")
   const secs = String(duration % 60).padStart(2, "0")
 
   useEffect(() => {
-    if (status === "recording") {
-      timerRef.current = setInterval(() => {
-        setDuration(useStore.getState().duration + 1)
-      }, 1000)
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-  }, [status])
+    async function setupListeners() {
+      const unlistenDuration = await listen<number>("duration_tick", (e) => {
+        setDuration(e.payload)
+      })
 
-  function handleRecord() {
-    if (status === "idle") setStatus("recording")
-    else if (status === "recording") setStatus("paused")
-    else if (status === "paused") setStatus("recording")
+      const unlistenStatus = await listen<string>("recording_status", (e) => {
+        setStatus(e.payload as "idle" | "recording" | "paused")
+      })
+
+      const unlistenError = await listen<string>("recording_error", (e) => {
+        console.error("Recording error:", e.payload)
+      })
+
+      unlistenRef.current = [unlistenDuration, unlistenStatus, unlistenError]
+    }
+
+    setupListeners()
+
+    return () => {
+      unlistenRef.current.forEach((u) => u())
+    }
+  }, [])
+
+  async function handleRecord() {
+    try {
+      if (status === "idle") {
+        const outputPath = `${Date.now()}_devreel.mp4`
+        await invoke("start_recording", { outputPath })
+        await invoke("start_caption_stream")
+      } else if (status === "recording" || status === "paused") {
+        await invoke("pause_recording")
+      }
+    } catch (e) {
+      console.error("Record error:", e)
+    }
   }
 
-  function handleStop() {
-    setStatus("idle")
-    setDuration(0)
+  async function handleStop() {
+    try {
+      await invoke("stop_recording")
+      await invoke("stop_caption_stream")
+      setDuration(0)
+    } catch (e) {
+      console.error("Stop error:", e)
+    }
+  }
+
+  async function handleExport() {
+    try {
+      await invoke("export_reel", {
+        config: {
+          input_path: "",
+          output_path: `${Date.now()}_devreel_export.mp4`,
+          width: 7680,
+          height: 4320,
+          fps: 60,
+          quality: "Ultra",
+        }
+      })
+    } catch (e) {
+      console.error("Export error:", e)
+    }
   }
 
   return (
@@ -154,6 +198,7 @@ export default function Timeline() {
 
         <button
           className="btn btn-accent"
+          onClick={handleExport}
           style={{ marginLeft: "auto", fontSize: 11, padding: "4px 14px" }}
         >
           Export 8K ↗
