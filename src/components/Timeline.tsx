@@ -119,21 +119,27 @@ export default function Timeline() {
   }
 
   async function handleExport() {
-    try {
-      await invoke("export_reel", {
-        config: {
-          input_path: "",
-          output_path: `${Date.now()}_devreel_export.mp4`,
-          width: 7680,
-          height: 4320,
-          fps: 60,
-          quality: "Ultra",
-        }
-      })
-    } catch (e) {
-      console.error("Export error:", e)
-    }
+  try {
+    const { save } = await import("@tauri-apps/plugin-dialog")
+    const outputPath = await save({
+      filters: [{ name: "Video", extensions: ["mp4"] }],
+      defaultPath: `devreel_${Date.now()}.mp4`,
+    })
+    if (!outputPath) return
+    await invoke("export_reel", {
+      config: {
+        input_path: "",
+        output_path: outputPath,
+        width: 1920,
+        height: 1080,
+        fps: 30,
+        quality: "High",
+      }
+    })
+  } catch (e) {
+    console.error("Export error:", e)
   }
+}
 
   return (
     <div style={{

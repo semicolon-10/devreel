@@ -1,7 +1,7 @@
-pub mod ffmpeg;
-
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
+
+pub mod ffmpeg;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportConfig {
@@ -29,6 +29,12 @@ pub struct ExportProgress {
 
 #[tauri::command]
 pub fn export_reel(app: AppHandle, config: ExportConfig) -> Result<String, String> {
+    if config.output_path.is_empty() {
+        return Err("Output path is empty".into());
+    }
+
+    eprintln!("export_reel called with path: {}", config.output_path);
+
     let app_clone = app.clone();
 
     std::thread::spawn(move || {
@@ -40,27 +46,21 @@ pub fn export_reel(app: AppHandle, config: ExportConfig) -> Result<String, Strin
             (100.0, "Finalizing"),
         ];
 
-        for (percent, stage) in stages {
+        for (percent, stage) in &stages {
             let _ = app_clone.emit("export_progress", ExportProgress {
-                percent,
-                stage: stage.into(),
+                percent: *percent,
+                stage: stage.to_string(),
                 eta_secs: ((100.0 - percent) / 10.0) as u32,
             });
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(300));
         }
 
-        match ffmpeg::encode(&app_clone, ExportConfig {
-            input_path: String::new(),
-            output_path: String::new(),
-            width: 7680,
-            height: 4320,
-            fps: 60,
-            quality: ExportQuality::Ultra,
-        }) {
+        match ffmpeg::encode(&app_clone, config) {
             Ok(path) => {
                 let _ = app_clone.emit("export_complete", path);
             }
             Err(e) => {
+                eprintln!("Export error: {}", e);
                 let _ = app_clone.emit("export_error", e);
             }
         }

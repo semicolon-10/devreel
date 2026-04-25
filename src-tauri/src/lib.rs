@@ -4,6 +4,18 @@ mod encoder;
 
 use tauri::Manager;
 
+
+#[tauri::command]
+fn list_capture_devices() -> String {
+    let output = std::process::Command::new("ffmpeg")
+        .args(["-f", "avfoundation", "-list_devices", "true", "-i", ""])
+        .output();
+    
+    match output {
+        Ok(o) => String::from_utf8_lossy(&o.stderr).to_string(),
+        Err(e) => e.to_string(),
+    }
+}
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -23,6 +35,7 @@ pub fn run() {
             caption::start_caption_stream,
             caption::stop_caption_stream,
             encoder::export_reel,
+            list_capture_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application")
