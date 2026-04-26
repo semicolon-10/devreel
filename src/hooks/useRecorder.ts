@@ -1,21 +1,15 @@
 import { useRef } from "react"
 import { useStore } from "@/store"
 
-interface PositionSample {
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
 export function useRecorder() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
+  const displayStreamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const durationRef = useRef(0)
-  const positionRef = useRef<PositionSample | null>(null)
-  const browserWRef = useRef<number>(0)
+  const rafRef = useRef<number>(0)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const videoElRef = useRef<HTMLVideoElement | null>(null)
 
   const { setStatus, setDuration, setHasRecording, setRecordingBlob } = useStore()
 
@@ -32,24 +26,28 @@ export function useRecorder() {
     setDuration(0)
   }
 
-  function samplePosition() {
-    const phoneFrame = document.querySelector("[data-phone-frame]") as HTMLElement
-    if (!phoneFrame) return
+  /**
+   * On each animation frame, read the phone frame's current position,
+   * crop that region from the tab capture, and draw it onto the canvas.
+   * This makes the recording immune to browser resize/scroll.
+   */
+  function drawLoop(video: HTMLVideoElement, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
+    const phoneFrame = document.querySelector("[data-phone-frame]") as HTMLElement | null
+    if (!phoneFrame || video.paused || video.ended) return
 
     const frameRect = phoneFrame.getBoundingClientRect()
-    const docRect = document.documentElement.getBoundingClientRect()
 
-    browserWRef.current = docRect.width
+    // The display stream captures the tab at device-pixel-ratio resolution.
+    // getBoundingClientRect gives CSS pixels, so scale by devicePixelRatio.
+    const dpr = window.devicePixelRatio || 1
+    const sx = frameRect.left * dpr
+    const sy = frameRect.top * dpr
+    const sw = frameRect.width * dpr
+    const sh = frameRect.height * dpr
 
-    positionRef.current = {
-      x: frameRect.left - docRect.left,
-      y: Math.max(0, frameRect.top - docRect.top),
-      w: frameRect.width,
-      h: frameRect.height,
-    }
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
 
-    console.log("Position sampled:", positionRef.current)
-    console.log("Browser doc width:", browserWRef.current)
+    rafRef.current = requestAnimationFrame(() => drawLoop(video, canvas, ctx))
   }
 
   async function startRecording() {
@@ -57,21 +55,62 @@ export function useRecorder() {
     setHasRecording(false)
     setRecordingBlob(null)
 
-    samplePosition()
-
+    // Capture the current browser tab
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
       video: { frameRate: { ideal: 30 } },
       audio: true,
+      // @ts-expect-error -- preferCurrentTab is supported in Chromium
+      preferCurrentTab: true,
     })
+
+    displayStreamRef.current = displayStream
+
+    // Set up a hidden video element to play the tab capture
+    const video = document.createElement("video")
+    video.srcObject = displayStream
+    video.muted = true
+    await video.play()
+    videoElRef.current = video
+
+    // Create an offscreen canvas at 1080×1920 (final output resolution)
+    const canvas = document.createElement("canvas")
+    canvas.width = 1080
+    canvas.height = 1920
+    canvasRef.current = canvas
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: false })!
+
+    // Start the draw loop — re-samples phone frame position every frame
+    drawLoop(video, canvas, ctx)
+
+    // The canvas stream is what we actually record (phone frame only)
+    const canvasStream = canvas.captureStream(30)
+
+    // Mix in audio: tab audio + optional mic
+    const audioCtx = new AudioContext()
+    const dest = audioCtx.createMediaStreamDestination()
+
+    const displayAudioTracks = displayStream.getAudioTracks()
+    if (displayAudioTracks.length > 0) {
+      const tabSource = audioCtx.createMediaStreamSource(
+        new MediaStream(displayAudioTracks),
+      )
+      tabSource.connect(dest)
+    }
 
     try {
       const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      micStream.getAudioTracks().forEach((t) => displayStream.addTrack(t))
+      const micSource = audioCtx.createMediaStreamSource(micStream)
+      micSource.connect(dest)
     } catch {
       console.warn("Mic not available")
     }
 
-    streamRef.current = displayStream
+    // Combine canvas video + mixed audio into one stream
+    const combinedStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks(),
+    ])
 
     displayStream.getVideoTracks()[0].onended = () => {
       if (mediaRecorderRef.current?.state !== "inactive") stopRecording()
@@ -81,7 +120,7 @@ export function useRecorder() {
       ? "video/webm;codecs=vp9"
       : "video/webm"
 
-    const recorder = new MediaRecorder(displayStream, {
+    const recorder = new MediaRecorder(combinedStream, {
       mimeType,
       videoBitsPerSecond: 8_000_000,
     })
@@ -112,6 +151,18 @@ export function useRecorder() {
 
   function stopRecording(): Promise<Blob> {
     return new Promise((resolve) => {
+      // Stop the draw loop
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = 0
+
+      // Clean up video element
+      if (videoElRef.current) {
+        videoElRef.current.pause()
+        videoElRef.current.srcObject = null
+        videoElRef.current = null
+      }
+      canvasRef.current = null
+
       const recorder = mediaRecorderRef.current
       if (!recorder || recorder.state === "inactive") {
         resolve(new Blob())
@@ -125,17 +176,10 @@ export function useRecorder() {
         resolve(blob)
       }
       recorder.stop()
-      streamRef.current?.getTracks().forEach((t) => t.stop())
+      displayStreamRef.current?.getTracks().forEach((t) => t.stop())
       setStatus("idle")
     })
   }
 
-  function getPositionData() {
-    return {
-      position: positionRef.current,
-      browserW: browserWRef.current,
-    }
-  }
-
-  return { startRecording, pauseRecording, stopRecording, getPositionData }
+  return { startRecording, pauseRecording, stopRecording }
 }

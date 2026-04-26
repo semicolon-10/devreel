@@ -54,7 +54,7 @@ function TrackRow({ label, color, progress }: {
 
 export default function Timeline() {
   const { status, duration, hasRecording, recordingBlob } = useStore()
-  const { startRecording, pauseRecording, stopRecording, getPositionData } = useRecorder()
+  const { startRecording, pauseRecording, stopRecording } = useRecorder()
   const { exportVideo, ffmpegLoaded } = useFFmpeg()
 
   const maxDuration = 60
@@ -85,8 +85,7 @@ export default function Timeline() {
   async function handleExport() {
     if (!recordingBlob || !ffmpegLoaded) return
     try {
-      const { position, browserW } = getPositionData()
-      const mp4 = await exportVideo(recordingBlob, position, browserW)
+      const mp4 = await exportVideo(recordingBlob)
       const url = URL.createObjectURL(mp4)
       const a = document.createElement("a")
       a.href = url
