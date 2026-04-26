@@ -13,7 +13,6 @@ const tools: { id: Tool; label: string; icon: React.ReactNode }[] = [
 
 export default function Sidebar() {
   const { tool, setTool, setShowCode, showCaptions, setShowCaptions } = useStore()
-
   function handleToolClick(id: Tool) {
     setTool(id)
     setShowCode(id === "code")

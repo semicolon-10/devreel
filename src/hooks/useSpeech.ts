@@ -8,6 +8,7 @@ export function useSpeech() {
   useEffect(() => {
     if (!showCaptions || status !== "recording") {
       recognitionRef.current?.stop()
+      setActiveCaptions([])
       return
     }
 
@@ -15,10 +16,7 @@ export function useSpeech() {
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition
 
-    if (!SpeechRecognition) {
-      console.warn("Speech recognition not supported")
-      return
-    }
+    if (!SpeechRecognition) return
 
     const recognition = new SpeechRecognition()
     recognition.continuous = true
@@ -26,21 +24,36 @@ export function useSpeech() {
     recognition.lang = "en-US"
 
     recognition.onresult = (event: any) => {
-      const results = Array.from(event.results as SpeechRecognitionResultList)
-      const latest = results[results.length - 1]
-      const transcript = latest[0].transcript.trim()
-      if (!transcript) return
+      let interim = ""
+      let final = ""
 
-      const caption = {
-        id: Date.now().toString(),
-        text: transcript.toUpperCase(),
-        startTime: Date.now() / 1000,
-        endTime: Date.now() / 1000 + 3,
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          final += transcript
+        } else {
+          interim += transcript
+        }
       }
 
-      if (latest.isFinal) addCaption(caption)
-      setActiveCaptions([caption])
-      setTimeout(() => setActiveCaptions([]), 3000)
+      if (final) {
+        const caption = {
+          id: Date.now().toString(),
+          text: final.trim().toUpperCase(),
+          startTime: Date.now() / 1000,
+          endTime: Date.now() / 1000 + 3,
+        }
+        addCaption(caption)
+        setActiveCaptions([caption])
+        setTimeout(() => setActiveCaptions([]), 2500)
+      } else if (interim) {
+        setActiveCaptions([{
+          id: "interim",
+          text: interim.trim().toUpperCase(),
+          startTime: Date.now() / 1000,
+          endTime: Date.now() / 1000 + 3,
+        }])
+      }
     }
 
     recognition.onerror = (e: any) => {
@@ -56,6 +69,9 @@ export function useSpeech() {
     recognition.start()
     recognitionRef.current = recognition
 
-    return () => recognition.stop()
+    return () => {
+      recognition.stop()
+      setActiveCaptions([])
+    }
   }, [showCaptions, status])
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import { useStore } from "@/store"
 import CodeBlock from "@/components/CodeBlock"
 import Whiteboard from "@/components/Whiteboard"
@@ -56,6 +57,19 @@ function RecIndicator() {
 
 export default function Preview() {
   useSpeech()
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [debugInfo, setDebugInfo] = useState("")
+
+  useEffect(() => {
+    function update() {
+      if (!frameRef.current) return
+      const r = frameRef.current.getBoundingClientRect()
+      setDebugInfo(`left:${Math.round(r.left)} top:${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)} | innerW:${window.innerWidth}`)
+    }
+    update()
+    window.addEventListener("resize", update)
+    return () => window.removeEventListener("resize", update)
+  }, [])
 
   return (
     <div style={{
@@ -74,17 +88,21 @@ export default function Preview() {
         pointerEvents: "none",
       }} />
 
-      <div style={{
-        width: 360,
-        height: 640,
-        borderRadius: 36,
-        border: "1.5px solid rgba(255,255,255,0.12)",
-        background: "linear-gradient(180deg, #0d0d1a 0%, #0a0a12 100%)",
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
-        flexShrink: 0,
-      }}>
+      <div
+        ref={frameRef}
+        data-phone-frame
+        style={{
+          width: 360,
+          height: 640,
+          borderRadius: 36,
+          border: "1.5px solid rgba(255,255,255,0.12)",
+          background: "linear-gradient(180deg, #0d0d1a 0%, #0a0a12 100%)",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+          flexShrink: 0,
+        }}
+      >
         <RecIndicator />
         <CodeBlock />
         <Whiteboard />
@@ -116,6 +134,18 @@ export default function Preview() {
             </div>
           </div>
         ))}
+
+        <div style={{
+          background: "rgba(0,0,0,0.6)",
+          border: "0.5px solid rgba(139,92,246,0.3)",
+          borderRadius: "var(--radius-md)",
+          padding: "5px 8px",
+        }}>
+          <div className="label" style={{ marginBottom: 2 }}>debug</div>
+          <div style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", lineHeight: 1.6 }}>
+            {debugInfo}
+          </div>
+        </div>
       </div>
     </div>
   )

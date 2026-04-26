@@ -1,12 +1,21 @@
 import { useRef } from "react"
 import { useStore } from "@/store"
 
+interface PositionSample {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export function useRecorder() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const durationRef = useRef(0)
+  const positionRef = useRef<PositionSample | null>(null)
+  const browserWRef = useRef<number>(0)
 
   const { setStatus, setDuration, setHasRecording, setRecordingBlob } = useStore()
 
@@ -23,31 +32,50 @@ export function useRecorder() {
     setDuration(0)
   }
 
+  function samplePosition() {
+    const phoneFrame = document.querySelector("[data-phone-frame]") as HTMLElement
+    if (!phoneFrame) return
+
+    const frameRect = phoneFrame.getBoundingClientRect()
+    const docRect = document.documentElement.getBoundingClientRect()
+
+    browserWRef.current = docRect.width
+
+    positionRef.current = {
+      x: frameRect.left - docRect.left,
+      y: Math.max(0, frameRect.top - docRect.top),
+      w: frameRect.width,
+      h: frameRect.height,
+    }
+
+    console.log("Position sampled:", positionRef.current)
+    console.log("Browser doc width:", browserWRef.current)
+  }
+
   async function startRecording() {
     chunksRef.current = []
     setHasRecording(false)
     setRecordingBlob(null)
 
+    samplePosition()
+
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
-      video: {
-        frameRate: { ideal: 30 },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
+      video: { frameRate: { ideal: 30 } },
       audio: true,
     })
 
     try {
-      const micStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
-      })
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       micStream.getAudioTracks().forEach((t) => displayStream.addTrack(t))
     } catch {
       console.warn("Mic not available")
     }
 
     streamRef.current = displayStream
+
+    displayStream.getVideoTracks()[0].onended = () => {
+      if (mediaRecorderRef.current?.state !== "inactive") stopRecording()
+    }
 
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
       ? "video/webm;codecs=vp9"
@@ -60,12 +88,6 @@ export function useRecorder() {
 
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data)
-    }
-
-    displayStream.getVideoTracks()[0].onended = () => {
-      if (mediaRecorderRef.current?.state !== "inactive") {
-        stopRecording()
-      }
     }
 
     recorder.start(500)
@@ -95,21 +117,25 @@ export function useRecorder() {
         resolve(new Blob())
         return
       }
-
       stopTimer()
-
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "video/webm" })
         setRecordingBlob(blob)
         setHasRecording(true)
         resolve(blob)
       }
-
       recorder.stop()
       streamRef.current?.getTracks().forEach((t) => t.stop())
       setStatus("idle")
     })
   }
 
-  return { startRecording, pauseRecording, stopRecording }
+  function getPositionData() {
+    return {
+      position: positionRef.current,
+      browserW: browserWRef.current,
+    }
+  }
+
+  return { startRecording, pauseRecording, stopRecording, getPositionData }
 }
